@@ -22,11 +22,7 @@
 
 #define CAN_STATE_THREAD_STACK_SIZE 512
 #define CAN_STATE_THREAD_PRIORITY   2
-#define LED_MSG_ID                  0x10
-#define COUNTER_MSG_ID              0x12345
-#define SLEEP_TIME                  K_MSEC(10)
-
-#define MAX_PID_SERVICE_1 0xC4
+#define SLEEP_TIME                  K_MSEC(100)
 
 #define RX_THREAD_STACK_SIZE 512
 #define RX_THREAD_PRIORITY   2
@@ -39,8 +35,7 @@
 
 #define MAX_OBD2_RES_ID 0x7EF
 #define MIN_OBD2_RES_ID 0x7E8
-
-#define VEHICLE_SPEED_PID 13
+#define SERVICE_RESPONE_OFFSET 0x40
 
 #define BITRATE_500K        500000
 #define SAMPLING_POINT_87_5 875
@@ -120,6 +115,32 @@ obd2_supported_pids_t m_vehicle_info_supported_pids[VEHICLE_INFO_SUPPORTED_PIDS]
 };
 
 /**
+ * Iterate through all the bits of the binary number and increment the count variable if the current
+ * bit is 1.
+ *
+ * @param binary_number The binary number whose number of 1's is to be counted.
+ *
+ * @return The number of 1's in the binary number.
+ */
+uint8_t binary_ones_count(uint32_t binary_number)
+{
+    // Initialise count variables
+    uint8_t ones_number = 0;
+
+    // Iterate through all the bits
+    while (binary_number > 0)
+    {
+        // If current bit is 1
+        if (binary_number & 1)
+        {
+            ones_number++;
+        }
+        binary_number = binary_number >> 1;
+    }
+    return ones_number;
+}
+
+/**
  * It prints the contents of a CAN frame to the console
  *
  * @param frame The CAN frame to print
@@ -138,6 +159,9 @@ void obd2_frame_print(struct can_frame * frame)
            frame->data[7]);
 }
 
+/**
+ * It prints the supported PIDs for each service
+ */
 void obd2_acq_supported_pids_print(void)
 {
     uint8_t pid_index = 0;
@@ -145,32 +169,36 @@ void obd2_acq_supported_pids_print(void)
     printf("[OBD2] Supported CURRENT_DATA service PIDs:\n");
     for (pid_index = 0; pid_index < DATA_SUPPORTED_PIDS; pid_index++)
     {
-        printf("Index: %d -> supported: 0x%x.\n",
-               pid_index,
+        printf("Supported pid 0x%02x-0x%02x: 0x%08x.\n",
+               pid_index * 0x20 + 1,
+               (pid_index + 1) * 0x20,
                m_current_data_supported_pids[pid_index].acq_pids);
     }
 
     printf("[OBD2] Supported CURRENT_DATA service PIDs:\n");
     for (pid_index = 0; pid_index < DATA_SUPPORTED_PIDS; pid_index++)
     {
-        printf("Index: %d -> supported: 0x%x.\n",
-               pid_index,
+        printf("Supported pid 0x%02x-0x%02x: 0x%08x.\n",
+               pid_index * 0x20 + 1,
+               (pid_index + 1) * 0x20,
                m_freeze_data_supported_pids[pid_index].acq_pids);
     }
 
     printf("[OBD2] Supported TEST_RESULTS_NON_CAN service PIDs:\n");
     for (pid_index = 0; pid_index < TEST_RES_NON_CAN_SUPPORTED_PIDS; pid_index++)
     {
-        printf("Index: %d -> supported: 0x%x.\n",
-               pid_index,
+        printf("Supported pid 0x%02x-0x%02x: 0x%08x.\n",
+               pid_index * 0x20 + 1,
+               (pid_index + 1) * 0x20,
                m_test_res_non_can_supported_pids[pid_index].acq_pids);
     }
 
     printf("[OBD2] Supported VEHICLE_INFORMATION service PIDs:\n");
     for (pid_index = 0; pid_index < VEHICLE_INFO_SUPPORTED_PIDS; pid_index++)
     {
-        printf("Index: %d -> supported: 0x%x.\n",
-               pid_index,
+        printf("Supported pid 0x%02x-0x%02x: 0x%08x.\n",
+               pid_index * 0x20 + 1,
+               (pid_index + 1) * 0x20,
                m_vehicle_info_supported_pids[pid_index].acq_pids);
     }
 }
@@ -221,15 +249,28 @@ char * state_to_str(enum can_state state)
     }
 }
 
+/**
+ * It takes a CAN frame and returns the data portion of the frame as a 32-bit unsigned integer
+ * 
+ * @param frame The CAN frame to get the data from.
+ * 
+ * @return The data from the CAN frame.
+ */
 uint32_t obd2_frame_data_get(struct can_frame * frame)
 {
-    return (uint32_t)(frame->data[3] + frame->data[4] + frame->data[5] + frame->data[6]);
+    return ((uint32_t)frame->data[3]) + ((uint32_t)frame->data[4] << 8) +
+           ((uint32_t)frame->data[5] << 16) + ((uint32_t)frame->data[6]<< 24);
 }
 
+/**
+ * It takes a CAN frame and checks the PIDs that are supported by the vehicle
+ * 
+ * @param frame The CAN frame that was received.
+ */
 void obd2_supported_pids_get(struct can_frame * frame)
 {
     uint8_t pid_index = 0;
-    switch (frame->data[1] - 0x40)
+    switch (frame->data[1] - SERVICE_RESPONE_OFFSET)
     {
         case CURRENT_DATA:
             for (pid_index = 0; pid_index < DATA_SUPPORTED_PIDS; pid_index++)
@@ -273,6 +314,13 @@ void obd2_supported_pids_get(struct can_frame * frame)
     }
 }
 
+/**
+ * It waits for the supported PIDs to be received, then it prints them and waits for the next CAN frame
+ * 
+ * @param arg1 CAN device
+ * @param arg2 CAN device
+ * @param arg3 The third argument to the thread.
+ */
 void rx_thread(void * arg1, void * arg2, void * arg3)
 {
     printf("Initialization of rx_thread.\n");
@@ -364,6 +412,11 @@ int obd2_request_send(obd2_services_t service, uint8_t pid)
     return ret;
 }
 
+/**
+ * It sends a request for each PID in the supported PIDs list for the given service
+ * 
+ * @param service The service to send the request to.
+ */
 void obd2_supported_pids_requests_send(obd2_services_t service)
 {
     uint8_t pid_index = 0;
@@ -373,13 +426,15 @@ void obd2_supported_pids_requests_send(obd2_services_t service)
             for (pid_index = 0; pid_index < DATA_SUPPORTED_PIDS; pid_index++)
             {
                 obd2_request_send(service, m_current_data_supported_pids[pid_index].req_pid);
+                k_sleep(SLEEP_TIME);
             }
             break;
 
         case FREEZE_FRAME_DATA:
             for (pid_index = 0; pid_index < DATA_SUPPORTED_PIDS; pid_index++)
             {
-                obd2_request_send(service, m_current_data_supported_pids[pid_index].req_pid);
+                obd2_request_send(service, m_freeze_data_supported_pids[pid_index].req_pid);
+                k_sleep(SLEEP_TIME);
             }
             break;
 
@@ -387,6 +442,7 @@ void obd2_supported_pids_requests_send(obd2_services_t service)
             for (pid_index = 0; pid_index < TEST_RES_NON_CAN_SUPPORTED_PIDS; pid_index++)
             {
                 obd2_request_send(service, m_test_res_non_can_supported_pids[pid_index].req_pid);
+                k_sleep(SLEEP_TIME);
             }
             break;
 
@@ -394,6 +450,7 @@ void obd2_supported_pids_requests_send(obd2_services_t service)
             for (pid_index = 0; pid_index < VEHICLE_INFO_SUPPORTED_PIDS; pid_index++)
             {
                 obd2_request_send(service, m_vehicle_info_supported_pids[pid_index].req_pid);
+                k_sleep(SLEEP_TIME);
             }
             break;
 
@@ -403,6 +460,129 @@ void obd2_supported_pids_requests_send(obd2_services_t service)
     }
 }
 
+/**
+ * It counts the number of ones in the binary representation of the PIDs supported by the given service
+ * 
+ * @param service The service to get the number of supported PIDs for.
+ * 
+ * @return The number of supported PIDs for the given service.
+ */
+uint8_t obd2_supported_pids_number_get(obd2_services_t service)
+{
+    uint8_t supported_pids_number = 0;
+    uint8_t pid_index;
+
+    switch (service)
+    {
+        case CURRENT_DATA:
+            for (pid_index = 0; pid_index < DATA_SUPPORTED_PIDS; pid_index++)
+            {
+                supported_pids_number +=
+                    binary_ones_count(m_current_data_supported_pids[pid_index].acq_pids);
+            }
+            break;
+
+        case FREEZE_FRAME_DATA:
+            for (pid_index = 0; pid_index < DATA_SUPPORTED_PIDS; pid_index++)
+            {
+                supported_pids_number +=
+                    binary_ones_count(m_freeze_data_supported_pids[pid_index].acq_pids);
+            }
+            break;
+
+        case TEST_RESULTS_NON_CAN:
+            for (pid_index = 0; pid_index < TEST_RES_NON_CAN_SUPPORTED_PIDS; pid_index++)
+            {
+                supported_pids_number +=
+                    binary_ones_count(m_test_res_non_can_supported_pids[pid_index].acq_pids);
+            }
+            break;
+
+        case VEHICLE_INFORMATION:
+            for (pid_index = 0; pid_index < VEHICLE_INFO_SUPPORTED_PIDS; pid_index++)
+            {
+                supported_pids_number +=
+                    binary_ones_count(m_vehicle_info_supported_pids[pid_index].acq_pids);
+            }
+            break;
+
+        default:
+            printf("Service %02x does not have PID that shows supported PIDs.", service);
+            break;
+    }
+
+    return supported_pids_number;
+}
+
+/**
+ * It takes a pointer to an array of PIDs, and a service, and it fills the array with the PIDs that are
+ * supported by the service
+ * 
+ * @param p_service_pids pointer to the array where the supported PIDs will be stored.
+ * @param service The service to decode the supported PIDs for.
+ */
+void obd2_supported_pids_decode(uint8_t * p_service_pids, obd2_services_t service)
+{
+    uint8_t                 pid_offset;
+    uint8_t                 pid;
+    uint32_t                pids_to_decode;
+    uint8_t                 supported_pids_group_num = 0;
+    obd2_supported_pids_t * p_service_supported_pids = NULL;
+
+    switch (service)
+    {
+        case CURRENT_DATA:
+            supported_pids_group_num = DATA_SUPPORTED_PIDS;
+            p_service_supported_pids = m_current_data_supported_pids;
+            break;
+
+        case FREEZE_FRAME_DATA:
+            supported_pids_group_num = DATA_SUPPORTED_PIDS;
+            p_service_supported_pids = m_freeze_data_supported_pids;
+            break;
+
+        case TEST_RESULTS_NON_CAN:
+            supported_pids_group_num = TEST_RES_NON_CAN_SUPPORTED_PIDS;
+            p_service_supported_pids = m_test_res_non_can_supported_pids;
+            break;
+
+        case VEHICLE_INFORMATION:
+            supported_pids_group_num = VEHICLE_INFO_SUPPORTED_PIDS;
+            p_service_supported_pids = m_vehicle_info_supported_pids;
+            break;
+
+        default:
+            printf("Service %02x does not have PID that shows supported PIDs.", service);
+            break;
+    }
+
+    for (uint8_t pid_group = 0; pid_group < supported_pids_group_num; pid_group++)
+    {
+        pid            = 0;
+        pid_offset     = p_service_supported_pids[pid_group].req_pid + 1;
+        pids_to_decode = p_service_supported_pids[pid_group].acq_pids;
+        while (pids_to_decode > 0)
+        {
+            // If current pid is supported
+            if (pids_to_decode & 1)
+            {
+                *p_service_pids = pid + pid_offset;
+                p_service_pids++;
+            }
+            pid++;
+            pids_to_decode = pids_to_decode >> 1;
+        }
+    }
+}
+
+/**
+ * It sends requests for supported PIDs, waits for the responses, and then sends requests for the
+ * supported PIDs
+ * 
+ * @param arg1 Pointer to the first argument passed to the thread.
+ * @param arg2 The CAN interface to use.
+ * @param arg3 The third argument to the thread.
+ */
 void tx_thread(void * arg1, void * arg2, void * arg3)
 {
     printf("Initialization of tx_thread.\n");
@@ -434,21 +614,45 @@ void tx_thread(void * arg1, void * arg2, void * arg3)
         k_mutex_unlock(&supp_pids_finished_mutex);
     }
 
-    obd2_services_t service = CURRENT_DATA;
-    uint8_t         pid     = 0;
+    uint8_t vehicle_info_pids_num = obd2_supported_pids_number_get(VEHICLE_INFORMATION);
+    uint8_t vehicle_info_pids[vehicle_info_pids_num];
+    obd2_supported_pids_decode(vehicle_info_pids, VEHICLE_INFORMATION);
+
+    obd2_services_t service = VEHICLE_INFORMATION;
+    uint8_t         pid_idx;
+
+    for (pid_idx = 0; pid_idx < vehicle_info_pids_num; pid_idx++)
+    {
+        obd2_request_send(service, vehicle_info_pids[pid_idx]);
+        k_sleep(SLEEP_TIME);
+    }
+
+    uint8_t current_data_pids_num = obd2_supported_pids_number_get(CURRENT_DATA);
+    uint8_t current_data_pids[current_data_pids_num];
+    obd2_supported_pids_decode(current_data_pids, CURRENT_DATA);
+
+    service = CURRENT_DATA;
+    pid_idx = 0;
 
     while (1)
     {
-        obd2_request_send(service, pid);
-        pid++;
-        if (pid == MAX_PID_SERVICE_1)
+        obd2_request_send(service, current_data_pids[pid_idx]);
+        pid_idx++;
+        if (pid_idx == current_data_pids_num)
         {
-            pid = 0;
+            pid_idx = 0;
         }
         k_sleep(SLEEP_TIME);
     }
 }
 
+/**
+ * It prints the CAN controller state, the number of received and transmitted errors
+ * 
+ * @param unused1 The first parameter of the thread function.
+ * @param unused2 The second parameter to the thread function.
+ * @param unused3 This is the third parameter passed to the thread.
+ */
 void can_state_thread(void * unused1, void * unused2, void * unused3)
 {
     printf("Initialization of can_state_thread.\n");
@@ -490,6 +694,13 @@ void can_state_thread(void * unused1, void * unused2, void * unused3)
     }
 }
 
+/**
+ * It prints the current state of the CAN controller. 
+ * If the controller is in the bus-off state and CONFIG_CAN_AUTO_BUS_OFF_RECOVERY=y, it
+ * attempts to recover from it.
+ * 
+ * @param work The work item to be executed.
+ */
 void state_change_work_handler(struct k_work * work)
 {
     printf("State Change ISR\nstate: %s\n"
@@ -512,6 +723,14 @@ void state_change_work_handler(struct k_work * work)
 #endif /* CONFIG_CAN_AUTO_BUS_OFF_RECOVERY */
 }
 
+/**
+ * It's a callback function that gets called when the CAN state changes
+ * 
+ * @param dev The device that triggered the callback.
+ * @param state The current state of the CAN controller.
+ * @param err_cnt A struct containing the current error counters for the CAN bus.
+ * @param user_data A pointer to the work object that will be submitted to the work queue.
+ */
 void state_change_callback(const struct device *  dev,
                            enum can_state         state,
                            struct can_bus_err_cnt err_cnt,
@@ -578,6 +797,14 @@ void can_init(const struct device * can_dev)
     printf("CAN: Device %s initialization finished.\n", can_dev->name);
 }
 
+/**
+ * It creates three threads, one for each of the three main tasks of the CAN driver:
+ * 
+ * * `can_state_thread`: This thread is responsible for monitoring the state of the CAN driver and
+ * changing it as necessary.
+ * * `rx_thread`: This thread is responsible for receiving CAN messages.
+ * * `tx_thread`: This thread is responsible for transmitting CAN messages
+ */
 void can_threads_init(void)
 {
     k_work_init(&state_change_work, state_change_work_handler);
