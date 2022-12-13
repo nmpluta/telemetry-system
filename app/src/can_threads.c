@@ -20,8 +20,6 @@
 
 #include "can_threads.h"
 
-#define CAN_STATE_THREAD_STACK_SIZE 512
-#define CAN_STATE_THREAD_PRIORITY   2
 #define SLEEP_TIME                  K_MSEC(100)
 
 #define RX_THREAD_STACK_SIZE 512
@@ -69,7 +67,7 @@ struct can_bus_err_cnt current_err_cnt;
 bool m_rx_supported_pids_finished = false;
 bool m_tx_supported_pids_finished = false;
 
-CAN_MSGQ_DEFINE(can_msgq, 2);
+CAN_MSGQ_DEFINE(can_msgq, 10);
 
 typedef enum
 {
