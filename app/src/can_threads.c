@@ -20,7 +20,7 @@
 
 #include "can_threads.h"
 
-#define SLEEP_TIME                  K_MSEC(100)
+#define SLEEP_TIME K_MSEC(100)
 
 #define RX_THREAD_STACK_SIZE 512
 #define RX_THREAD_PRIORITY   2
@@ -31,8 +31,8 @@
 #define CAN_STATE_THREAD_STACK_SIZE 512
 #define CAN_STATE_THREAD_PRIORITY   2
 
-#define MAX_OBD2_RES_ID 0x7EF
-#define MIN_OBD2_RES_ID 0x7E8
+#define MAX_OBD2_RES_ID        0x7EF
+#define MIN_OBD2_RES_ID        0x7E8
 #define SERVICE_RESPONE_OFFSET 0x40
 
 #define BITRATE_500K        500000
@@ -68,6 +68,7 @@ bool m_rx_supported_pids_finished = false;
 bool m_tx_supported_pids_finished = false;
 
 CAN_MSGQ_DEFINE(can_msgq, 10);
+extern struct k_msgq sd_msgq;
 
 typedef enum
 {
@@ -249,20 +250,20 @@ char * state_to_str(enum can_state state)
 
 /**
  * It takes a CAN frame and returns the data portion of the frame as a 32-bit unsigned integer
- * 
+ *
  * @param frame The CAN frame to get the data from.
- * 
+ *
  * @return The data from the CAN frame.
  */
 uint32_t obd2_frame_data_get(struct can_frame * frame)
 {
     return ((uint32_t)frame->data[3]) + ((uint32_t)frame->data[4] << 8) +
-           ((uint32_t)frame->data[5] << 16) + ((uint32_t)frame->data[6]<< 24);
+           ((uint32_t)frame->data[5] << 16) + ((uint32_t)frame->data[6] << 24);
 }
 
 /**
  * It takes a CAN frame and checks the PIDs that are supported by the vehicle
- * 
+ *
  * @param frame The CAN frame that was received.
  */
 void obd2_supported_pids_get(struct can_frame * frame)
@@ -313,8 +314,9 @@ void obd2_supported_pids_get(struct can_frame * frame)
 }
 
 /**
- * It waits for the supported PIDs to be received, then it prints them and waits for the next CAN frame
- * 
+ * It waits for the supported PIDs to be received, then it prints them and waits for the next CAN
+ * frame
+ *
  * @param arg1 CAN device
  * @param arg2 CAN device
  * @param arg3 The third argument to the thread.
@@ -371,6 +373,11 @@ void rx_thread(void * arg1, void * arg2, void * arg3)
     while (1)
     {
         k_msgq_get(&can_msgq, &frame, K_FOREVER);
+        while (k_msgq_put(&sd_msgq, &frame, K_NO_WAIT) != 0)
+        {
+            /* message queue is full: purge old data & try again */
+            k_msgq_purge(&sd_msgq);
+        }
 
         printf("[OBD2] RESPOND:\n");
         obd2_frame_print(&frame);
@@ -412,7 +419,7 @@ int obd2_request_send(obd2_services_t service, uint8_t pid)
 
 /**
  * It sends a request for each PID in the supported PIDs list for the given service
- * 
+ *
  * @param service The service to send the request to.
  */
 void obd2_supported_pids_requests_send(obd2_services_t service)
@@ -459,10 +466,11 @@ void obd2_supported_pids_requests_send(obd2_services_t service)
 }
 
 /**
- * It counts the number of ones in the binary representation of the PIDs supported by the given service
- * 
+ * It counts the number of ones in the binary representation of the PIDs supported by the given
+ * service
+ *
  * @param service The service to get the number of supported PIDs for.
- * 
+ *
  * @return The number of supported PIDs for the given service.
  */
 uint8_t obd2_supported_pids_number_get(obd2_services_t service)
@@ -513,9 +521,9 @@ uint8_t obd2_supported_pids_number_get(obd2_services_t service)
 }
 
 /**
- * It takes a pointer to an array of PIDs, and a service, and it fills the array with the PIDs that are
- * supported by the service
- * 
+ * It takes a pointer to an array of PIDs, and a service, and it fills the array with the PIDs that
+ * are supported by the service
+ *
  * @param p_service_pids pointer to the array where the supported PIDs will be stored.
  * @param service The service to decode the supported PIDs for.
  */
@@ -576,7 +584,7 @@ void obd2_supported_pids_decode(uint8_t * p_service_pids, obd2_services_t servic
 /**
  * It sends requests for supported PIDs, waits for the responses, and then sends requests for the
  * supported PIDs
- * 
+ *
  * @param arg1 Pointer to the first argument passed to the thread.
  * @param arg2 The CAN interface to use.
  * @param arg3 The third argument to the thread.
@@ -646,7 +654,7 @@ void tx_thread(void * arg1, void * arg2, void * arg3)
 
 /**
  * It prints the CAN controller state, the number of received and transmitted errors
- * 
+ *
  * @param unused1 The first parameter of the thread function.
  * @param unused2 The second parameter to the thread function.
  * @param unused3 This is the third parameter passed to the thread.
@@ -693,10 +701,10 @@ void can_state_thread(void * unused1, void * unused2, void * unused3)
 }
 
 /**
- * It prints the current state of the CAN controller. 
+ * It prints the current state of the CAN controller.
  * If the controller is in the bus-off state and CONFIG_CAN_AUTO_BUS_OFF_RECOVERY=y, it
  * attempts to recover from it.
- * 
+ *
  * @param work The work item to be executed.
  */
 void state_change_work_handler(struct k_work * work)
@@ -723,7 +731,7 @@ void state_change_work_handler(struct k_work * work)
 
 /**
  * It's a callback function that gets called when the CAN state changes
- * 
+ *
  * @param dev The device that triggered the callback.
  * @param state The current state of the CAN controller.
  * @param err_cnt A struct containing the current error counters for the CAN bus.
@@ -797,7 +805,7 @@ void can_init(const struct device * can_dev)
 
 /**
  * It creates three threads, one for each of the three main tasks of the CAN driver:
- * 
+ *
  * * `can_state_thread`: This thread is responsible for monitoring the state of the CAN driver and
  * changing it as necessary.
  * * `rx_thread`: This thread is responsible for receiving CAN messages.
