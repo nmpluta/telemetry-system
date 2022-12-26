@@ -8,19 +8,19 @@
  * @file can_threads.c
  * @brief Can related threads
  */
+#include <zephyr/logging/log.h>
+LOG_MODULE_REGISTER(can_threads, LOG_LEVEL_DBG);
 
 #include <stdio.h>
 #include <zephyr/kernel.h>
-#include <zephyr/sys/printk.h>
 #include <zephyr/device.h>
 #include <zephyr/drivers/can.h>
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/sys/byteorder.h>
-#include <zephyr/logging/log.h>
 
 #include "can_threads.h"
 
-#define SLEEP_TIME K_MSEC(100)
+#define SLEEP_TIME K_MSEC(200)
 
 #define RX_THREAD_STACK_SIZE 512
 #define RX_THREAD_PRIORITY   2
@@ -47,8 +47,6 @@ K_THREAD_STACK_DEFINE(rx_thread_stack, RX_THREAD_STACK_SIZE);
 K_THREAD_STACK_DEFINE(tx_thread_stack, TX_THREAD_STACK_SIZE);
 K_THREAD_STACK_DEFINE(can_state_stack, CAN_STATE_THREAD_STACK_SIZE);
 
-LOG_MODULE_DECLARE(can_threads, LOG_LEVEL_DBG);
-
 struct k_thread rx_thread_data;
 struct k_thread tx_thread_data;
 struct k_thread can_state_thread_data;
@@ -69,7 +67,6 @@ bool m_tx_supported_pids_finished = false;
 
 CAN_MSGQ_DEFINE(can_msgq, 10);
 extern struct k_msgq sd_msgq;
-
 typedef enum
 {
     CURRENT_DATA = 0x1,
@@ -146,7 +143,7 @@ uint8_t binary_ones_count(uint32_t binary_number)
  */
 void obd2_frame_print(struct can_frame * frame)
 {
-    printf("[OBD2] [%03x] %02x %02x %02x %02x %02x %02x %02x %02x\n",
+    LOG_INF("[OBD2] [%03x] %02x %02x %02x %02x %02x %02x %02x %02x",
            frame->id,
            frame->data[0],
            frame->data[1],
@@ -165,37 +162,37 @@ void obd2_acq_supported_pids_print(void)
 {
     uint8_t pid_index = 0;
 
-    printf("[OBD2] Supported CURRENT_DATA service PIDs:\n");
+    LOG_INF("[OBD2] Supported CURRENT_DATA service PIDs:");
     for (pid_index = 0; pid_index < DATA_SUPPORTED_PIDS; pid_index++)
     {
-        printf("Supported pid 0x%02x-0x%02x: 0x%08x.\n",
+        LOG_INF("Supported pid 0x%02x-0x%02x: 0x%08x.",
                pid_index * 0x20 + 1,
                (pid_index + 1) * 0x20,
                m_current_data_supported_pids[pid_index].acq_pids);
     }
 
-    printf("[OBD2] Supported CURRENT_DATA service PIDs:\n");
+    LOG_INF("[OBD2] Supported CURRENT_DATA service PIDs:");
     for (pid_index = 0; pid_index < DATA_SUPPORTED_PIDS; pid_index++)
     {
-        printf("Supported pid 0x%02x-0x%02x: 0x%08x.\n",
+        LOG_INF("Supported pid 0x%02x-0x%02x: 0x%08x.",
                pid_index * 0x20 + 1,
                (pid_index + 1) * 0x20,
                m_freeze_data_supported_pids[pid_index].acq_pids);
     }
 
-    printf("[OBD2] Supported TEST_RESULTS_NON_CAN service PIDs:\n");
+    LOG_INF("[OBD2] Supported TEST_RESULTS_NON_CAN service PIDs:");
     for (pid_index = 0; pid_index < TEST_RES_NON_CAN_SUPPORTED_PIDS; pid_index++)
     {
-        printf("Supported pid 0x%02x-0x%02x: 0x%08x.\n",
+        LOG_INF("Supported pid 0x%02x-0x%02x: 0x%08x.",
                pid_index * 0x20 + 1,
                (pid_index + 1) * 0x20,
                m_test_res_non_can_supported_pids[pid_index].acq_pids);
     }
 
-    printf("[OBD2] Supported VEHICLE_INFORMATION service PIDs:\n");
+    LOG_INF("[OBD2] Supported VEHICLE_INFORMATION service PIDs:");
     for (pid_index = 0; pid_index < VEHICLE_INFO_SUPPORTED_PIDS; pid_index++)
     {
-        printf("Supported pid 0x%02x-0x%02x: 0x%08x.\n",
+        LOG_INF("Supported pid 0x%02x-0x%02x: 0x%08x.",
                pid_index * 0x20 + 1,
                (pid_index + 1) * 0x20,
                m_vehicle_info_supported_pids[pid_index].acq_pids);
@@ -218,7 +215,7 @@ void tx_irq_callback(const struct device * dev, int error, void * arg)
 
     if (0 != error)
     {
-        printf("Callback! error-code: %d\nSender: %s\n", error, sender);
+        LOG_INF("Callback! error-code: %d\nSender: %s", error, sender);
     }
 }
 
@@ -323,7 +320,7 @@ void obd2_supported_pids_get(struct can_frame * frame)
  */
 void rx_thread(void * arg1, void * arg2, void * arg3)
 {
-    printf("Initialization of rx_thread.\n");
+    LOG_INF("Initialization of rx_thread.");
 
     ARG_UNUSED(arg1);
     ARG_UNUSED(arg2);
@@ -337,7 +334,7 @@ void rx_thread(void * arg1, void * arg2, void * arg3)
     int              filter_id;
 
     filter_id = can_add_rx_filter_msgq(can_dev, &can_msgq, &filter);
-    printf("Filter id: %d.\n", filter_id);
+    LOG_INF("Filter id: %d.", filter_id);
 
     int ret;
     (void)ret;
@@ -379,7 +376,7 @@ void rx_thread(void * arg1, void * arg2, void * arg3)
             k_msgq_purge(&sd_msgq);
         }
 
-        printf("[OBD2] RESPOND:\n");
+        LOG_INF("[OBD2] RESPOND:");
         obd2_frame_print(&frame);
         k_sleep(SLEEP_TIME);
     }
@@ -408,11 +405,11 @@ int obd2_request_send(obd2_services_t service, uint8_t pid)
     ret = can_send(can_dev, &frame, K_FOREVER, tx_irq_callback, NULL);
     if (ret != 0)
     {
-        printf("Sending failed [%d].", ret);
+        LOG_INF("Sending failed [%d].", ret);
     }
     else
     {
-        printf("[OBD2] REQUEST: Service = %02x Pid = %02x.\n", service, pid);
+        LOG_INF("[OBD2] REQUEST: Service = %02x Pid = %02x.", service, pid);
     }
     return ret;
 }
@@ -460,7 +457,7 @@ void obd2_supported_pids_requests_send(obd2_services_t service)
             break;
 
         default:
-            printf("Service %02x does not have PID that shows supported PIDs.", service);
+            LOG_INF("Service %02x does not have PID that shows supported PIDs.", service);
             break;
     }
 }
@@ -513,7 +510,7 @@ uint8_t obd2_supported_pids_number_get(obd2_services_t service)
             break;
 
         default:
-            printf("Service %02x does not have PID that shows supported PIDs.", service);
+            LOG_INF("Service %02x does not have PID that shows supported PIDs.", service);
             break;
     }
 
@@ -558,7 +555,7 @@ void obd2_supported_pids_decode(uint8_t * p_service_pids, obd2_services_t servic
             break;
 
         default:
-            printf("Service %02x does not have PID that shows supported PIDs.", service);
+            LOG_INF("Service %02x does not have PID that shows supported PIDs.", service);
             break;
     }
 
@@ -591,7 +588,7 @@ void obd2_supported_pids_decode(uint8_t * p_service_pids, obd2_services_t servic
  */
 void tx_thread(void * arg1, void * arg2, void * arg3)
 {
-    printf("Initialization of tx_thread.\n");
+    LOG_INF("Initialization of tx_thread.");
 
     ARG_UNUSED(arg1);
     ARG_UNUSED(arg2);
@@ -661,7 +658,7 @@ void tx_thread(void * arg1, void * arg2, void * arg3)
  */
 void can_state_thread(void * unused1, void * unused2, void * unused3)
 {
-    printf("Initialization of can_state_thread.\n");
+    LOG_INF("Initialization of can_state_thread.");
 
     struct can_bus_err_cnt err_cnt      = {0, 0};
     struct can_bus_err_cnt err_cnt_prev = {0, 0};
@@ -674,7 +671,7 @@ void can_state_thread(void * unused1, void * unused2, void * unused3)
         err = can_get_state(can_dev, &state, &err_cnt);
         if (0 != err)
         {
-            printf("Failed to get CAN controller state: %d", err);
+            LOG_INF("Failed to get CAN controller state: %d", err);
             k_sleep(K_MSEC(100));
             continue;
         }
@@ -686,9 +683,9 @@ void can_state_thread(void * unused1, void * unused2, void * unused3)
             err_cnt_prev.tx_err_cnt = err_cnt.tx_err_cnt;
             err_cnt_prev.rx_err_cnt = err_cnt.rx_err_cnt;
             state_prev              = state;
-            printf("state: %s\n"
-                   "rx error count: %d\n"
-                   "tx error count: %d\n",
+            LOG_INF("state: %s"
+                   "rx error count: %d"
+                   "tx error count: %d",
                    state_to_str(state),
                    err_cnt.rx_err_cnt,
                    err_cnt.tx_err_cnt);
@@ -709,9 +706,9 @@ void can_state_thread(void * unused1, void * unused2, void * unused3)
  */
 void state_change_work_handler(struct k_work * work)
 {
-    printf("State Change ISR\nstate: %s\n"
-           "rx error count: %d\n"
-           "tx error count: %d\n",
+    LOG_INF("State Change ISR\nstate: %s"
+           "rx error count: %d"
+           "tx error count: %d",
            state_to_str(current_state),
            current_err_cnt.rx_err_cnt,
            current_err_cnt.tx_err_cnt);
@@ -719,11 +716,11 @@ void state_change_work_handler(struct k_work * work)
 #ifndef CONFIG_CAN_AUTO_BUS_OFF_RECOVERY
     if (current_state == CAN_STATE_BUS_OFF)
     {
-        printf("Recover from bus-off\n");
+        LOG_INF("Recover from bus-off");
 
         if (can_recover(can_dev, K_MSEC(100)) != 0)
         {
-            printf("Recovery timed out\n");
+            LOG_INF("Recovery timed out");
         }
     }
 #endif /* CONFIG_CAN_AUTO_BUS_OFF_RECOVERY */
@@ -767,40 +764,40 @@ void can_init(const struct device * can_dev)
     ret = device_is_ready(can_dev);
     if (false == ret)
     {
-        printf("CAN: Device %s not ready.\n", can_dev->name);
+        LOG_INF("CAN: Device %s not ready.", can_dev->name);
     }
 
     ret = can_calc_timing(can_dev, &timing, BITRATE_500K, SAMPLING_POINT_87_5);
     if (ret > 0)
     {
-        printf("Sample-Point error: %d", ret);
+        LOG_INF("Sample-Point error: %d", ret);
     }
 
     if (ret < 0)
     {
-        printf("Failed to calc a valid timing");
+        LOG_INF("Failed to calc a valid timing");
         return;
     }
 
     ret = can_set_timing(can_dev, &timing);
     if (0 != ret)
     {
-        printf("Failed to set timing");
+        LOG_INF("Failed to set timing");
     }
 
     ret = can_set_mode(can_dev, CAN_MODE_NORMAL);
     if (0 != ret)
     {
-        printf("Failed to set CAN controller operation service");
+        LOG_INF("Failed to set CAN controller operation service");
     }
 
     ret = can_start(can_dev);
     if (0 != ret)
     {
-        printf("Failed to start CAN controller");
+        LOG_INF("Failed to start CAN controller");
     }
 
-    printf("CAN: Device %s initialization finished.\n", can_dev->name);
+    LOG_INF("CAN: Device %s initialization finished.", can_dev->name);
 }
 
 /**
@@ -828,7 +825,7 @@ void can_threads_init(void)
                                     K_NO_WAIT);
     if (!can_state_tid)
     {
-        printf("ERROR spawning can state thread\n");
+        LOG_ERR("ERROR spawning can state thread.");
     }
 
     rx_tid = k_thread_create(&rx_thread_data,
@@ -843,7 +840,7 @@ void can_threads_init(void)
                              K_NO_WAIT);
     if (!rx_tid)
     {
-        printf("ERROR spawning rx thread\n");
+        LOG_ERR("ERROR spawning rx thread");
     }
 
     tx_tid = k_thread_create(&tx_thread_data,
@@ -858,7 +855,7 @@ void can_threads_init(void)
                              K_NO_WAIT);
     if (!tx_tid)
     {
-        printf("ERROR spawning tx thread\n");
+        LOG_ERR("ERROR spawning tx thread.");
     }
 
     can_set_state_change_callback(can_dev, state_change_callback, &state_change_work);
