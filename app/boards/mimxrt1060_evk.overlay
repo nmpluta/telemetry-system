@@ -1,0 +1,18 @@
+/*
+ * Copyright (c) 2022 Natalia Pluta
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+ &arduino_serial {
+	status = "okay";
+	current-speed = < 115200 >;
+
+	gsm: gsm_mode {
+		compatible = "zephyr,gsm-ppp";
+	};
+};
+
+&enet{
+	status = "disabled";
+};

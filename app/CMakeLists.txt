@@ -16,4 +16,6 @@ target_include_directories(app PRIVATE ${CMAKE_BINARY_DIR}/app/include src)
 
 target_sources(app PRIVATE src/main.c
                            src/can_threads.c src/can_threads.h
-                           src/sd_threads.c src/sd_threads.h)
+                           src/sd_threads.c src/sd_threads.h
+                           src/http_threads.c src/http_threads.h
+                           src/sockets.c src/sockets.h)
