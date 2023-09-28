@@ -1,7 +1,7 @@
-# Zephyr OBD2-Logger Application
+# Zephyr Telemetry System Application
 
-This repository contains a Zephyr OBD2-Logger application. The main purpose of this
-repository is to developed data acquistion system in vehicles based on OBD2 protocols.
+The project contains a Zephyr Telemetry System application. The main purpose of this
+repository is to developed embedded system for data acquisition, storing and transmission.
 
 This repository is versioned together with the [Zephyr main tree][zephyr]. This
 means that every time that Zephyr is tagged, this repository is tagged as well
@@ -12,6 +12,7 @@ point to the development branch of Zephyr, also `main`.
 
 [app_dev]: https://docs.zephyrproject.org/latest/develop/application/index.html
 [workspace_app]: https://docs.zephyrproject.org/latest/develop/application/index.html#zephyr-workspace-app
+[modules]: https://docs.zephyrproject.org/latest/develop/modules.html
 [west_t2]: https://docs.zephyrproject.org/latest/develop/west/workspaces.html#west-t2
 [board_porting]: https://docs.zephyrproject.org/latest/guides/porting/board_porting.html
 [bindings]: https://docs.zephyrproject.org/latest/guides/dts/bindings.html
@@ -22,44 +23,54 @@ point to the development branch of Zephyr, also `main`.
 ## Getting Started
 
 Before getting started, make sure you have a proper Zephyr development
-environment. You can follow the official
+environment. Follow the official
 [Zephyr Getting Started Guide](https://docs.zephyrproject.org/latest/getting_started/index.html).
 
 ### Initialization
 
-The first step is to initialize the workspace folder (``workspace-obd2-logger``) where
+The first step is to initialize the workspace folder (``workspace-telemetry-system``) where
 the ``application`` and all Zephyr modules will be cloned. You can do
 that by running:
 
 ```shell
-# initialize workspace-obd2-logger for the application (main branch)
-west init -m https://github.com/zephyrproject-rtos/application --mr main workspace-obd2-logger
+# initialize workspace-telemetry-system for the application (main branch)
+west init -m https://github.com/zephyrproject-rtos/application --mr main workspace-telemetry-system
 # update Zephyr modules
-cd workspace-obd2-logger
+cd workspace-telemetry-system
 west update
 ```
 
-### Build & Run
+### Building and running
 
-The application can be built by running:
+To build the application, run the following command:
 
 ```shell
 west build -b $BOARD app
 ```
 
-where `$BOARD` is the target board. The `custom_plank` board found in this
-repository can be used. Note that Zephyr sample boards may be used if an
+where `$BOARD` is the target board.
+
+You can use the `custom_plank` board found in this
+repository. Note that Zephyr sample boards may be used if an
 appropriate overlay is provided (see `app/boards`).
 
-A sample debug configuration is also provided. You can apply it by running:
+A sample debug configuration is also provided. To apply it, run the following
+command:
 
 ```shell
 west build -b $BOARD app -- -DOVERLAY_CONFIG=debug.conf
 ```
 
-Note that you may also use it together with `rtt.conf` if using Segger RTT. Once
-you have built the application you can flash it by running:
+Once you have built the application, run the following command to flash it:
 
 ```shell
 west flash
+```
+
+### Testing
+
+To execute Twister integration tests, run the following command:
+
+```shell
+west twister -T tests --integration
 ```
