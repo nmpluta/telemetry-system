@@ -3,7 +3,7 @@
 
 manifest:
   self:
-    path: obd2-logger
+    path: telemetry-system
     west-commands: scripts/west-commands.yml
 
   remotes:
