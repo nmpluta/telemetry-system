@@ -1,9 +1,9 @@
-# Private config options for obd2-logger app
+# Private config options for telemetry-system app
 
 # Copyright (c) 2022 Natalia Pluta
 # SPDX-License-Identifier: Apache-2.0
 
-mainmenu "OBD2 logger"
+mainmenu "Telemetry System"
 
 menu "TagoIO IoT Cloud Configuration"
 

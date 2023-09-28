@@ -12,10 +12,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
         with:
-          path: obd2-logger
+          path: telemetry-system
 
       - name: Initialize
-        working-directory: obd2-logger
+        working-directory: telemetry-system
         run: |
           pip3 install -U west
           west init -l .
@@ -23,7 +23,7 @@ jobs:
           pip3 install -r ../zephyr/scripts/requirements-base.txt
 
       - name: Build firmware
-        working-directory: obd2-logger
+        working-directory: telemetry-system
         run: |
           west build -b mimxrt1060_evk app
 
@@ -31,4 +31,4 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: firmware
-          path: obd2-logger/build/zephyr/zephyr.*
+          path: telemetry-system/build/zephyr/zephyr.*
