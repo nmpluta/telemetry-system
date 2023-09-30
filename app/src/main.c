@@ -21,7 +21,7 @@
 
 extern const struct device * const can_dev;
 
-void main(void)
+int main(void)
 {
     sd_disk_init();
     sd_threads_init();
@@ -35,4 +35,6 @@ void main(void)
     {
         k_sleep(SLEEP_TIME);
     }
+
+    return 0;
 }
