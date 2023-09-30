@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Natalia Pluta
+ * Copyright (c) 2022-2023 Natalia Pluta
  *
  * SPDX-License-Identifier: Apache-2.0
  */
