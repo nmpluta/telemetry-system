@@ -31,8 +31,9 @@ LOG_MODULE_REGISTER(can_threads, LOG_LEVEL_DBG);
 #define CAN_STATE_THREAD_STACK_SIZE 512
 #define CAN_STATE_THREAD_PRIORITY   2
 
-#define MAX_OBD2_RES_ID        0x7EF
-#define MIN_OBD2_RES_ID        0x7E8
+#define ALL_CAN_MSG_MASK 0x00
+#define ALL_CAN_MSG_ID   0x00
+
 #define SERVICE_RESPONE_OFFSET 0x40
 
 #define BITRATE_500K        500000
@@ -67,83 +68,15 @@ bool m_tx_supported_pids_finished = false;
 
 CAN_MSGQ_DEFINE(can_msgq, 10);
 extern struct k_msgq sd_msgq;
-typedef enum
-{
-    CURRENT_DATA = 0x1,
-    FREEZE_FRAME_DATA,
-    STORED_DTCS,
-    CLEAR_DTCS,
-    TEST_RESULTS_NON_CAN,
-    TEST_RESULTS_CAN,
-    PENDING_DTCS,
-    CONTROL_OPERATION,
-    VEHICLE_INFORMATION,
-    PERMAMENT_DTCS,
-} obd2_services_t;
-
-typedef struct
-{
-    uint8_t  req_pid;
-    uint32_t acq_pids;
-} obd2_supported_pids_t;
-
-obd2_supported_pids_t m_current_data_supported_pids[DATA_SUPPORTED_PIDS] = {
-    [0].req_pid = 0x00,
-    [1].req_pid = 0x20,
-    [2].req_pid = 0x40,
-    [3].req_pid = 0x60,
-    [4].req_pid = 0x80,
-    [5].req_pid = 0xA0,
-};
-obd2_supported_pids_t m_freeze_data_supported_pids[DATA_SUPPORTED_PIDS] = {
-    [0].req_pid = 0x00,
-    [1].req_pid = 0x20,
-    [2].req_pid = 0x40,
-    [3].req_pid = 0x60,
-    [4].req_pid = 0x80,
-    [5].req_pid = 0xA0,
-};
-obd2_supported_pids_t m_test_res_non_can_supported_pids[TEST_RES_NON_CAN_SUPPORTED_PIDS] = {
-    [0].req_pid = 0x00,
-};
-obd2_supported_pids_t m_vehicle_info_supported_pids[VEHICLE_INFO_SUPPORTED_PIDS] = {
-    [0].req_pid = 0x00,
-};
-
-/**
- * Iterate through all the bits of the binary number and increment the count variable if the current
- * bit is 1.
- *
- * @param binary_number The binary number whose number of 1's is to be counted.
- *
- * @return The number of 1's in the binary number.
- */
-uint8_t binary_ones_count(uint32_t binary_number)
-{
-    // Initialise count variables
-    uint8_t ones_number = 0;
-
-    // Iterate through all the bits
-    while (binary_number > 0)
-    {
-        // If current bit is 1
-        if (binary_number & 1)
-        {
-            ones_number++;
-        }
-        binary_number = binary_number >> 1;
-    }
-    return ones_number;
-}
 
 /**
  * It prints the contents of a CAN frame to the console
  *
  * @param frame The CAN frame to print
  */
-void obd2_frame_print(struct can_frame * frame)
+void can_frame_print(struct can_frame * frame)
 {
-    LOG_INF("[OBD2] [%03x] %02x %02x %02x %02x %02x %02x %02x %02x",
+    LOG_INF("[CAN] [%03x] %02x %02x %02x %02x %02x %02x %02x %02x",
            frame->id,
            frame->data[0],
            frame->data[1],
@@ -153,50 +86,6 @@ void obd2_frame_print(struct can_frame * frame)
            frame->data[5],
            frame->data[6],
            frame->data[7]);
-}
-
-/**
- * It prints the supported PIDs for each service
- */
-void obd2_acq_supported_pids_print(void)
-{
-    uint8_t pid_index = 0;
-
-    LOG_INF("[OBD2] Supported CURRENT_DATA service PIDs:");
-    for (pid_index = 0; pid_index < DATA_SUPPORTED_PIDS; pid_index++)
-    {
-        LOG_INF("Supported pid 0x%02x-0x%02x: 0x%08x.",
-               pid_index * 0x20 + 1,
-               (pid_index + 1) * 0x20,
-               m_current_data_supported_pids[pid_index].acq_pids);
-    }
-
-    LOG_INF("[OBD2] Supported CURRENT_DATA service PIDs:");
-    for (pid_index = 0; pid_index < DATA_SUPPORTED_PIDS; pid_index++)
-    {
-        LOG_INF("Supported pid 0x%02x-0x%02x: 0x%08x.",
-               pid_index * 0x20 + 1,
-               (pid_index + 1) * 0x20,
-               m_freeze_data_supported_pids[pid_index].acq_pids);
-    }
-
-    LOG_INF("[OBD2] Supported TEST_RESULTS_NON_CAN service PIDs:");
-    for (pid_index = 0; pid_index < TEST_RES_NON_CAN_SUPPORTED_PIDS; pid_index++)
-    {
-        LOG_INF("Supported pid 0x%02x-0x%02x: 0x%08x.",
-               pid_index * 0x20 + 1,
-               (pid_index + 1) * 0x20,
-               m_test_res_non_can_supported_pids[pid_index].acq_pids);
-    }
-
-    LOG_INF("[OBD2] Supported VEHICLE_INFORMATION service PIDs:");
-    for (pid_index = 0; pid_index < VEHICLE_INFO_SUPPORTED_PIDS; pid_index++)
-    {
-        LOG_INF("Supported pid 0x%02x-0x%02x: 0x%08x.",
-               pid_index * 0x20 + 1,
-               (pid_index + 1) * 0x20,
-               m_vehicle_info_supported_pids[pid_index].acq_pids);
-    }
 }
 
 /**
@@ -246,72 +135,7 @@ char * state_to_str(enum can_state state)
 }
 
 /**
- * It takes a CAN frame and returns the data portion of the frame as a 32-bit unsigned integer
- *
- * @param frame The CAN frame to get the data from.
- *
- * @return The data from the CAN frame.
- */
-uint32_t obd2_frame_data_get(struct can_frame * frame)
-{
-    return ((uint32_t)frame->data[3]) + ((uint32_t)frame->data[4] << 8) +
-           ((uint32_t)frame->data[5] << 16) + ((uint32_t)frame->data[6] << 24);
-}
-
-/**
- * It takes a CAN frame and checks the PIDs that are supported by the vehicle
- *
- * @param frame The CAN frame that was received.
- */
-void obd2_supported_pids_get(struct can_frame * frame)
-{
-    uint8_t pid_index = 0;
-    switch (frame->data[1] - SERVICE_RESPONE_OFFSET)
-    {
-        case CURRENT_DATA:
-            for (pid_index = 0; pid_index < DATA_SUPPORTED_PIDS; pid_index++)
-            {
-                if (frame->data[2] == m_current_data_supported_pids[pid_index].req_pid)
-                {
-                    m_current_data_supported_pids[pid_index].acq_pids = obd2_frame_data_get(frame);
-                }
-            }
-            break;
-        case FREEZE_FRAME_DATA:
-            for (pid_index = 0; pid_index < DATA_SUPPORTED_PIDS; pid_index++)
-            {
-                if (frame->data[2] == m_freeze_data_supported_pids[pid_index].req_pid)
-                {
-                    m_freeze_data_supported_pids[pid_index].acq_pids = obd2_frame_data_get(frame);
-                }
-            }
-            break;
-        case TEST_RESULTS_NON_CAN:
-            for (pid_index = 0; pid_index < TEST_RES_NON_CAN_SUPPORTED_PIDS; pid_index++)
-            {
-                if (frame->data[2] == m_test_res_non_can_supported_pids[pid_index].req_pid)
-                {
-                    m_test_res_non_can_supported_pids[pid_index].acq_pids =
-                        obd2_frame_data_get(frame);
-                }
-            }
-            break;
-        case VEHICLE_INFORMATION:
-            for (pid_index = 0; pid_index < VEHICLE_INFO_SUPPORTED_PIDS; pid_index++)
-            {
-                if (frame->data[2] == m_vehicle_info_supported_pids[pid_index].req_pid)
-                {
-                    m_vehicle_info_supported_pids[pid_index].acq_pids = obd2_frame_data_get(frame);
-                }
-            }
-            break;
-        default:
-            break;
-    }
-}
-
-/**
- * It waits for the supported PIDs to be received, then it prints them and waits for the next CAN
+ * It waits for any meesage to be received, then it prints them and waits for the next CAN
  * frame
  *
  * @param arg1 CAN device
@@ -327,8 +151,8 @@ void rx_thread(void * arg1, void * arg2, void * arg3)
     ARG_UNUSED(arg3);
 
     const struct can_filter filter = {.flags = CAN_FILTER_DATA,
-                                      .id    = MAX_OBD2_RES_ID,
-                                      .mask  = !(MAX_OBD2_RES_ID ^ MIN_OBD2_RES_ID)};
+                                      .id    = ALL_CAN_MSG_ID,
+                                      .mask  = ALL_CAN_MSG_MASK};
 
     struct can_frame frame;
     int              filter_id;
@@ -341,34 +165,6 @@ void rx_thread(void * arg1, void * arg2, void * arg3)
 
     while (1)
     {
-        k_mutex_lock(&supp_pids_finished_mutex, K_FOREVER);
-        ret = k_msgq_get(&can_msgq, &frame, K_MSEC(1000));
-        if (ret == -EAGAIN)
-        {
-            if (m_tx_supported_pids_finished)
-            {
-                m_rx_supported_pids_finished = true;
-                k_mutex_unlock(&supp_pids_finished_mutex);
-                break;
-            }
-            k_mutex_unlock(&supp_pids_finished_mutex);
-            break;
-        }
-        else
-        {
-            obd2_supported_pids_get(&frame);
-            k_mutex_unlock(&supp_pids_finished_mutex);
-        }
-    }
-
-    k_mutex_lock(&supp_pids_finished_mutex, K_FOREVER);
-    m_rx_supported_pids_finished = true;
-    k_mutex_unlock(&supp_pids_finished_mutex);
-
-    obd2_acq_supported_pids_print();
-
-    while (1)
-    {
         k_msgq_get(&can_msgq, &frame, K_FOREVER);
         while (k_msgq_put(&sd_msgq, &frame, K_NO_WAIT) != 0)
         {
@@ -376,205 +172,9 @@ void rx_thread(void * arg1, void * arg2, void * arg3)
             k_msgq_purge(&sd_msgq);
         }
 
-        LOG_INF("[OBD2] RESPOND:");
-        obd2_frame_print(&frame);
+        LOG_INF("Received message id = [%d].", frame.id);
+        can_frame_print(&frame);
         k_sleep(SLEEP_TIME);
-    }
-}
-
-/**
- * It sends a request to the OBD2 device
- *
- * @param service The service to request.
- * @param pid The parameter ID.
- *
- * @return The return value of the function.
- */
-int obd2_request_send(obd2_services_t service, uint8_t pid)
-{
-    int ret;
-    (void)ret;
-
-    struct can_frame frame = {
-        .id   = 0x7DF,
-        .dlc  = 8,
-        .data = {0x2, service, pid, 0x0, 0x0, 0x0, 0x0, 0x0},
-    };
-
-    /* A variable that stores the return value of the function. */
-    ret = can_send(can_dev, &frame, K_FOREVER, tx_irq_callback, NULL);
-    if (ret != 0)
-    {
-        LOG_INF("Sending failed [%d].", ret);
-    }
-    else
-    {
-        LOG_INF("[OBD2] REQUEST: Service = %02x Pid = %02x.", service, pid);
-    }
-    return ret;
-}
-
-/**
- * It sends a request for each PID in the supported PIDs list for the given service
- *
- * @param service The service to send the request to.
- */
-void obd2_supported_pids_requests_send(obd2_services_t service)
-{
-    uint8_t pid_index = 0;
-    switch (service)
-    {
-        case CURRENT_DATA:
-            for (pid_index = 0; pid_index < DATA_SUPPORTED_PIDS; pid_index++)
-            {
-                obd2_request_send(service, m_current_data_supported_pids[pid_index].req_pid);
-                k_sleep(SLEEP_TIME);
-            }
-            break;
-
-        case FREEZE_FRAME_DATA:
-            for (pid_index = 0; pid_index < DATA_SUPPORTED_PIDS; pid_index++)
-            {
-                obd2_request_send(service, m_freeze_data_supported_pids[pid_index].req_pid);
-                k_sleep(SLEEP_TIME);
-            }
-            break;
-
-        case TEST_RESULTS_NON_CAN:
-            for (pid_index = 0; pid_index < TEST_RES_NON_CAN_SUPPORTED_PIDS; pid_index++)
-            {
-                obd2_request_send(service, m_test_res_non_can_supported_pids[pid_index].req_pid);
-                k_sleep(SLEEP_TIME);
-            }
-            break;
-
-        case VEHICLE_INFORMATION:
-            for (pid_index = 0; pid_index < VEHICLE_INFO_SUPPORTED_PIDS; pid_index++)
-            {
-                obd2_request_send(service, m_vehicle_info_supported_pids[pid_index].req_pid);
-                k_sleep(SLEEP_TIME);
-            }
-            break;
-
-        default:
-            LOG_INF("Service %02x does not have PID that shows supported PIDs.", service);
-            break;
-    }
-}
-
-/**
- * It counts the number of ones in the binary representation of the PIDs supported by the given
- * service
- *
- * @param service The service to get the number of supported PIDs for.
- *
- * @return The number of supported PIDs for the given service.
- */
-uint8_t obd2_supported_pids_number_get(obd2_services_t service)
-{
-    uint8_t supported_pids_number = 0;
-    uint8_t pid_index;
-
-    switch (service)
-    {
-        case CURRENT_DATA:
-            for (pid_index = 0; pid_index < DATA_SUPPORTED_PIDS; pid_index++)
-            {
-                supported_pids_number +=
-                    binary_ones_count(m_current_data_supported_pids[pid_index].acq_pids);
-            }
-            break;
-
-        case FREEZE_FRAME_DATA:
-            for (pid_index = 0; pid_index < DATA_SUPPORTED_PIDS; pid_index++)
-            {
-                supported_pids_number +=
-                    binary_ones_count(m_freeze_data_supported_pids[pid_index].acq_pids);
-            }
-            break;
-
-        case TEST_RESULTS_NON_CAN:
-            for (pid_index = 0; pid_index < TEST_RES_NON_CAN_SUPPORTED_PIDS; pid_index++)
-            {
-                supported_pids_number +=
-                    binary_ones_count(m_test_res_non_can_supported_pids[pid_index].acq_pids);
-            }
-            break;
-
-        case VEHICLE_INFORMATION:
-            for (pid_index = 0; pid_index < VEHICLE_INFO_SUPPORTED_PIDS; pid_index++)
-            {
-                supported_pids_number +=
-                    binary_ones_count(m_vehicle_info_supported_pids[pid_index].acq_pids);
-            }
-            break;
-
-        default:
-            LOG_INF("Service %02x does not have PID that shows supported PIDs.", service);
-            break;
-    }
-
-    return supported_pids_number;
-}
-
-/**
- * It takes a pointer to an array of PIDs, and a service, and it fills the array with the PIDs that
- * are supported by the service
- *
- * @param p_service_pids pointer to the array where the supported PIDs will be stored.
- * @param service The service to decode the supported PIDs for.
- */
-void obd2_supported_pids_decode(uint8_t * p_service_pids, obd2_services_t service)
-{
-    uint8_t                 pid_offset;
-    uint8_t                 pid;
-    uint32_t                pids_to_decode;
-    uint8_t                 supported_pids_group_num = 0;
-    obd2_supported_pids_t * p_service_supported_pids = NULL;
-
-    switch (service)
-    {
-        case CURRENT_DATA:
-            supported_pids_group_num = DATA_SUPPORTED_PIDS;
-            p_service_supported_pids = m_current_data_supported_pids;
-            break;
-
-        case FREEZE_FRAME_DATA:
-            supported_pids_group_num = DATA_SUPPORTED_PIDS;
-            p_service_supported_pids = m_freeze_data_supported_pids;
-            break;
-
-        case TEST_RESULTS_NON_CAN:
-            supported_pids_group_num = TEST_RES_NON_CAN_SUPPORTED_PIDS;
-            p_service_supported_pids = m_test_res_non_can_supported_pids;
-            break;
-
-        case VEHICLE_INFORMATION:
-            supported_pids_group_num = VEHICLE_INFO_SUPPORTED_PIDS;
-            p_service_supported_pids = m_vehicle_info_supported_pids;
-            break;
-
-        default:
-            LOG_INF("Service %02x does not have PID that shows supported PIDs.", service);
-            break;
-    }
-
-    for (uint8_t pid_group = 0; pid_group < supported_pids_group_num; pid_group++)
-    {
-        pid            = 0;
-        pid_offset     = p_service_supported_pids[pid_group].req_pid + 1;
-        pids_to_decode = p_service_supported_pids[pid_group].acq_pids;
-        while (pids_to_decode > 0)
-        {
-            // If current pid is supported
-            if (pids_to_decode & 1)
-            {
-                *p_service_pids = pid + pid_offset;
-                p_service_pids++;
-            }
-            pid++;
-            pids_to_decode = pids_to_decode >> 1;
-        }
     }
 }
 
@@ -597,54 +197,25 @@ void tx_thread(void * arg1, void * arg2, void * arg3)
     int ret;
     (void)ret;
 
-    for (uint8_t reqs_attempt = 0; reqs_attempt < REQUEST_SUPPORTED_PIDS_ATTEMPTS; reqs_attempt++)
-    {
-        obd2_supported_pids_requests_send(CURRENT_DATA);
-        obd2_supported_pids_requests_send(VEHICLE_INFORMATION);
-    }
-    k_mutex_lock(&supp_pids_finished_mutex, K_FOREVER);
-    m_tx_supported_pids_finished = true;
-    k_mutex_unlock(&supp_pids_finished_mutex);
+    struct can_frame frame = {
+        .id   = 0x123,
+        .dlc  = 8,
+        .data = {1, 2, 3, 4, 5, 6, 7, 8},
+    };
 
     while (1)
     {
-        k_mutex_lock(&supp_pids_finished_mutex, K_FOREVER);
-        if (m_rx_supported_pids_finished)
+        /* A variable that stores the return value of the function. */
+        ret = can_send(can_dev, &frame, K_FOREVER, tx_irq_callback, NULL);
+        if (ret != 0)
         {
-            k_mutex_unlock(&supp_pids_finished_mutex);
-            break;
+            LOG_INF("Sending failed [%d].", ret);
         }
-        k_mutex_unlock(&supp_pids_finished_mutex);
-    }
-
-    uint8_t vehicle_info_pids_num = obd2_supported_pids_number_get(VEHICLE_INFORMATION);
-    uint8_t vehicle_info_pids[vehicle_info_pids_num];
-    obd2_supported_pids_decode(vehicle_info_pids, VEHICLE_INFORMATION);
-
-    obd2_services_t service = VEHICLE_INFORMATION;
-    uint8_t         pid_idx;
-
-    for (pid_idx = 0; pid_idx < vehicle_info_pids_num; pid_idx++)
-    {
-        obd2_request_send(service, vehicle_info_pids[pid_idx]);
-        k_sleep(SLEEP_TIME);
-    }
-
-    uint8_t current_data_pids_num = obd2_supported_pids_number_get(CURRENT_DATA);
-    uint8_t current_data_pids[current_data_pids_num];
-    obd2_supported_pids_decode(current_data_pids, CURRENT_DATA);
-
-    service = CURRENT_DATA;
-    pid_idx = 0;
-
-    while (1)
-    {
-        obd2_request_send(service, current_data_pids[pid_idx]);
-        pid_idx++;
-        if (pid_idx == current_data_pids_num)
+        else
         {
-            pid_idx = 0;
+            LOG_INF("Message id = [%d] successfully sended.\n", frame.id);
         }
+
         k_sleep(SLEEP_TIME);
     }
 }
