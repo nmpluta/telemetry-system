@@ -1,7 +1,7 @@
 #-------------------------------------------------------------------------------
 # Zephyr Telemetry System Application
 #
-# Copyright (c) 2021 Nordic Semiconductor ASA
+# Copyright (c) 2022-2023 Natalia Pluta
 # SPDX-License-Identifier: Apache-2.0
 
 cmake_minimum_required(VERSION 3.20.0)

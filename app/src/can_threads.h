@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2022-2023 Natalia Pluta
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 #ifndef CAN_THREADS
 #define CAN_THREADS
 
