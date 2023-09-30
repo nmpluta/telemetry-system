@@ -43,7 +43,6 @@ typedef enum
 
 static struct fs_dir_t  dirp;
 static struct fs_file_t filep;
-char *                  p_obd2_string_data;
 static FATFS            fat_fs;
 
 static struct fs_mount_t fatfs_mount = {
@@ -56,7 +55,7 @@ static struct fs_mount_t fatfs_mount = {
 void sd_file_create(void);
 void sd_file_write(char * p_string_data, size_t string_size);
 void sd_file_save(void);
-size_t obd2_string_frame_create(struct can_frame * frame, char * p_string_data);
+size_t can_string_frame_create(struct can_frame * frame, char * p_string_data);
 static void lsdir(const char * path);
 
 static const char * disk_mount_pt = FATFS_MNTP;
@@ -66,7 +65,7 @@ struct k_thread sd_logging_data;
 k_tid_t         sd_logging_tid;
 
 CAN_MSGQ_DEFINE(sd_msgq, 10);
-extern void obd2_frame_print(struct can_frame * frame);
+extern void can_frame_print(struct can_frame * frame);
 
 /**
  * It initializes the SD card
@@ -126,19 +125,21 @@ void sd_logging_thread(void * arg1, void * arg2, void * arg3)
     struct can_frame frame;
     sd_state_t       sd_state   = SD_LOGGING_DATA;
     uint16_t         sd_log_idx = 0;
+    char *           p_can_string_data = NULL;
+
     while (1)
     {
         k_msgq_get(&sd_msgq, &frame, K_FOREVER);
         printf("[SD] RECEIVED:\n");
-        obd2_frame_print(&frame);
+        can_frame_print(&frame);
 
         switch (sd_state)
         {
             case SD_LOGGING_DATA:
                 if (sd_log_idx < SD_LOGS)
                 {
-                    size_t obd2_string_size = obd2_string_frame_create(&frame, p_obd2_string_data);
-                    sd_file_write(p_obd2_string_data, obd2_string_size);
+                    size_t can_string_size = can_string_frame_create(&frame, p_can_string_data);
+                    sd_file_write(p_can_string_data, can_string_size);
                     sd_log_idx++;
                 }
                 else
@@ -295,7 +296,7 @@ void sd_file_write(char * p_string_data, size_t string_size)
  *
  * @return The number of characters written to the string.
  */
-size_t obd2_string_frame_create(struct can_frame * frame, char * p_string_data)
+size_t can_string_frame_create(struct can_frame * frame, char * p_string_data)
 {
     size_t char_nums = sprintf(p_string_data,
                                "%03x, %02x %02x %02x %02x %02x %02x %02x %02x\n",
