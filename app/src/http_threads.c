@@ -11,7 +11,7 @@ LOG_MODULE_REGISTER(tagoio_http_post, LOG_LEVEL_DBG);
 #include <zephyr/kernel.h>
 #include <zephyr/net/socket.h>
 #include <zephyr/net/http/client.h>
-#include <zephyr/random/rand32.h>
+#include <zephyr/random/random.h>
 #include <zephyr/drivers/can.h>
 
 #include "sockets.h"

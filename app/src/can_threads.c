@@ -150,7 +150,7 @@ void rx_thread(void * arg1, void * arg2, void * arg3)
     ARG_UNUSED(arg2);
     ARG_UNUSED(arg3);
 
-    const struct can_filter filter = {.flags = CAN_FILTER_DATA,
+    const struct can_filter filter = {.flags = 0U,
                                       .id    = ALL_CAN_MSG_ID,
                                       .mask  = ALL_CAN_MSG_MASK};
 
@@ -270,7 +270,7 @@ void can_state_thread(void * unused1, void * unused2, void * unused3)
 
 /**
  * It prints the current state of the CAN controller.
- * If the controller is in the bus-off state and CONFIG_CAN_AUTO_BUS_OFF_RECOVERY=y, it
+ * If the controller is in the bus-off state and CONFIG_CAN_MANUAL_RECOVERY_MODE=y, it
  * attempts to recover from it.
  *
  * @param work The work item to be executed.
@@ -284,7 +284,7 @@ void state_change_work_handler(struct k_work * work)
            current_err_cnt.rx_err_cnt,
            current_err_cnt.tx_err_cnt);
 
-#ifndef CONFIG_CAN_AUTO_BUS_OFF_RECOVERY
+#ifdef CONFIG_CAN_MANUAL_RECOVERY_MODE
     if (current_state == CAN_STATE_BUS_OFF)
     {
         LOG_INF("Recover from bus-off");
@@ -294,7 +294,7 @@ void state_change_work_handler(struct k_work * work)
             LOG_INF("Recovery timed out");
         }
     }
-#endif /* CONFIG_CAN_AUTO_BUS_OFF_RECOVERY */
+#endif /* CONFIG_CAN_MANUAL_RECOVERY_MODE */
 }
 
 /**
