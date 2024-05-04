@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023 Natalia Pluta
+ * Copyright (c) 2022-2024 Natalia Pluta
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -36,7 +36,7 @@ LOG_MODULE_REGISTER(can_threads, LOG_LEVEL_DBG);
 
 #define SERVICE_RESPONE_OFFSET 0x40
 
-#define BITRATE_500K        500000
+#define BITRATE_125K        125000
 #define SAMPLING_POINT_87_5 875
 
 #define DATA_SUPPORTED_PIDS             6
@@ -338,7 +338,7 @@ void can_init(const struct device * can_dev)
         LOG_INF("CAN: Device %s not ready.", can_dev->name);
     }
 
-    ret = can_calc_timing(can_dev, &timing, BITRATE_500K, SAMPLING_POINT_87_5);
+    ret = can_calc_timing(can_dev, &timing, BITRATE_125K, SAMPLING_POINT_87_5);
     if (ret > 0)
     {
         LOG_INF("Sample-Point error: %d", ret);
