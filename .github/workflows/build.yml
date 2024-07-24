@@ -32,3 +32,8 @@ jobs:
         with:
           name: firmware
           path: telemetry-system/build/zephyr/zephyr.*
+
+      - name: Format code
+        working-directory: telemetry-system
+        run: |
+          clang-format -i $(git diff --name-only HEAD^)

@@ -51,21 +51,20 @@ static struct fs_mount_t fatfs_mount = {
     .fs_data   = &fat_fs,
 };
 
+void   sd_file_create(void);
+void   sd_file_write(char *p_string_data, size_t string_size);
+void   sd_file_save(void);
+size_t can_string_frame_create(struct can_frame *frame, char *p_string_data);
+static void lsdir(const char *path);
 
-void sd_file_create(void);
-void sd_file_write(char * p_string_data, size_t string_size);
-void sd_file_save(void);
-size_t can_string_frame_create(struct can_frame * frame, char * p_string_data);
-static void lsdir(const char * path);
-
-static const char * disk_mount_pt = FATFS_MNTP;
+static const char *disk_mount_pt = FATFS_MNTP;
 
 K_THREAD_STACK_DEFINE(sd_logging_stack, SD_LOGGING_THREAD_STACK_SIZE);
 struct k_thread sd_logging_data;
 k_tid_t         sd_logging_tid;
 
 CAN_MSGQ_DEFINE(sd_msgq, 10);
-extern void can_frame_print(struct can_frame * frame);
+extern void can_frame_print(struct can_frame *frame);
 
 /**
  * It initializes the SD card
@@ -75,10 +74,10 @@ void sd_disk_init(void)
     /* raw disk i/o */
     do
     {
-        static const char * disk_pdrv = "SD";
-        uint64_t            memory_size_mb;
-        uint32_t            block_count;
-        uint32_t            block_size;
+        static const char *disk_pdrv = "SD";
+        uint64_t           memory_size_mb;
+        uint32_t           block_count;
+        uint32_t           block_size;
 
         if (disk_access_init(disk_pdrv) != 0)
         {
@@ -86,14 +85,16 @@ void sd_disk_init(void)
             break;
         }
 
-        if (disk_access_ioctl(disk_pdrv, DISK_IOCTL_GET_SECTOR_COUNT, &block_count))
+        if (disk_access_ioctl(
+                disk_pdrv, DISK_IOCTL_GET_SECTOR_COUNT, &block_count))
         {
             LOG_ERR("Unable to get sector count.");
             break;
         }
         LOG_INF("Block count %u.", block_count);
 
-        if (disk_access_ioctl(disk_pdrv, DISK_IOCTL_GET_SECTOR_SIZE, &block_size))
+        if (disk_access_ioctl(
+                disk_pdrv, DISK_IOCTL_GET_SECTOR_SIZE, &block_size))
         {
             LOG_ERR("Unable to get sector size.");
             break;
@@ -107,12 +108,12 @@ void sd_disk_init(void)
 
 /**
  * It creates a file, writes the received CAN frames to it, and closes the file
- * 
+ *
  * @param arg1 The first argument to pass to the thread.
  * @param arg2 The size of the message queue.
  * @param arg3 The third argument to the thread.
  */
-void sd_logging_thread(void * arg1, void * arg2, void * arg3)
+void sd_logging_thread(void *arg1, void *arg2, void *arg3)
 {
     LOG_INF("Initialization of sd_logging_thread.");
 
@@ -123,9 +124,9 @@ void sd_logging_thread(void * arg1, void * arg2, void * arg3)
     sd_file_create();
 
     struct can_frame frame;
-    sd_state_t       sd_state   = SD_LOGGING_DATA;
-    uint16_t         sd_log_idx = 0;
-    char *           p_can_string_data = NULL;
+    sd_state_t       sd_state          = SD_LOGGING_DATA;
+    uint16_t         sd_log_idx        = 0;
+    char            *p_can_string_data = NULL;
 
     while (1)
     {
@@ -138,7 +139,8 @@ void sd_logging_thread(void * arg1, void * arg2, void * arg3)
             case SD_LOGGING_DATA:
                 if (sd_log_idx < SD_LOGS)
                 {
-                    size_t can_string_size = can_string_frame_create(&frame, p_can_string_data);
+                    size_t can_string_size
+                        = can_string_frame_create(&frame, p_can_string_data);
                     sd_file_write(p_can_string_data, can_string_size);
                     sd_log_idx++;
                 }
@@ -255,11 +257,11 @@ void sd_file_create(void)
 
 /**
  * It writes the data to the file
- * 
+ *
  * @param p_string_data The data to be written to the file.
  * @param string_size The size of the string to be written to the file.
  */
-void sd_file_write(char * p_string_data, size_t string_size)
+void sd_file_write(char *p_string_data, size_t string_size)
 {
     int ret;
     (void)ret;
@@ -288,33 +290,35 @@ void sd_file_write(char * p_string_data, size_t string_size)
 }
 
 /**
- * It takes a CAN frame and a string buffer, and it writes the CAN frame to the string buffer in a
- * human readable format
+ * It takes a CAN frame and a string buffer, and it writes the CAN frame to the
+ * string buffer in a human readable format
  *
  * @param frame The CAN frame to be converted to a string.
- * @param p_string_data A pointer to the string buffer where the data will be stored.
+ * @param p_string_data A pointer to the string buffer where the data will be
+ * stored.
  *
  * @return The number of characters written to the string.
  */
-size_t can_string_frame_create(struct can_frame * frame, char * p_string_data)
+size_t can_string_frame_create(struct can_frame *frame, char *p_string_data)
 {
-    size_t char_nums = sprintf(p_string_data,
-                               "%03x, %02x %02x %02x %02x %02x %02x %02x %02x\n",
-                               frame->id,
-                               frame->data[0],
-                               frame->data[1],
-                               frame->data[2],
-                               frame->data[3],
-                               frame->data[4],
-                               frame->data[5],
-                               frame->data[6],
-                               frame->data[7]);
+    size_t char_nums
+        = sprintf(p_string_data,
+                  "%03x, %02x %02x %02x %02x %02x %02x %02x %02x\n",
+                  frame->id,
+                  frame->data[0],
+                  frame->data[1],
+                  frame->data[2],
+                  frame->data[3],
+                  frame->data[4],
+                  frame->data[5],
+                  frame->data[6],
+                  frame->data[7]);
     return char_nums;
 }
 
 /**
- * It opens a file, writes to it, syncs it, closes it, lists the directory, closes the directory, and
- * unmounts the file system
+ * It opens a file, writes to it, syncs it, closes it, lists the directory,
+ * closes the directory, and unmounts the file system
  */
 void sd_file_save(void)
 {
@@ -365,22 +369,23 @@ void sd_file_save(void)
 
 /**
  * It opens a directory, reads its content and prints it to the console
- * 
+ *
  * @param path The path to the directory to list.
  */
-static void lsdir(const char * path)
+static void lsdir(const char *path)
 {
     int                     ret;
     struct fs_dir_t         dirp;
     static struct fs_dirent entry;
 
-	fs_dir_t_init(&dirp);
+    fs_dir_t_init(&dirp);
 
-	/* Verify fs_opendir() */
-	ret = fs_opendir(&dirp, path);
-	if (ret) {
-		LOG_ERR("Error opening dir %s [%d]\n", path, ret);
-	}
+    /* Verify fs_opendir() */
+    ret = fs_opendir(&dirp, path);
+    if (ret)
+    {
+        LOG_ERR("Error opening dir %s [%d]\n", path, ret);
+    }
 
     LOG_INF("Listing dir %s ...", path);
     for (;;)
@@ -404,6 +409,6 @@ static void lsdir(const char * path)
         }
     }
 
-	/* Verify fs_closedir() */
-	fs_closedir(&dirp);
+    /* Verify fs_closedir() */
+    fs_closedir(&dirp);
 }
