@@ -15,21 +15,21 @@
 #include <zephyr/drivers/can.h>
 #include "can_threads.h"
 #include "sd_threads.h"
-#include "http_threads.h"
+#include "mqtt_threads.h"
 
 #define SLEEP_TIME K_MSEC(250)
 
-extern const struct device * const can_dev;
+extern const struct device *const can_dev;
 
 int main(void)
 {
     sd_disk_init();
     sd_threads_init();
 
-    http_threads_init();
-
     can_init(can_dev);
     can_threads_init();
+
+    mqtt_threads_init();
 
     while (1)
     {

@@ -23,7 +23,7 @@
 
 #define SD_LOGGING_THREAD_STACK_SIZE 2048
 #define SD_LOGGING_THREAD_PRIORITY   2
-#define SLEEP_TIME                   K_MSEC(50)
+#define SD_THREAD_SLEEP_MS           K_MSEC(50)
 
 #define SD_LOGS 100
 
@@ -159,7 +159,7 @@ void sd_logging_thread(void * arg1, void * arg2, void * arg3)
             default:
                 break;
         }
-        k_sleep(SLEEP_TIME);
+        k_sleep(SD_THREAD_SLEEP_MS);
     }
 }
 

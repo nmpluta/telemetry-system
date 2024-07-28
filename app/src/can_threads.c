@@ -20,7 +20,7 @@ LOG_MODULE_REGISTER(can_threads, LOG_LEVEL_DBG);
 
 #include "can_threads.h"
 
-#define SLEEP_TIME K_MSEC(200)
+#define CAN_THREAD_SLEEP_MS K_MSEC(200)
 
 #define RX_THREAD_STACK_SIZE 512
 #define RX_THREAD_PRIORITY   2
@@ -174,7 +174,7 @@ void rx_thread(void * arg1, void * arg2, void * arg3)
 
         LOG_INF("Received message id = [%d].", frame.id);
         can_frame_print(&frame);
-        k_sleep(SLEEP_TIME);
+        k_sleep(CAN_THREAD_SLEEP_MS);
     }
 }
 
@@ -216,7 +216,7 @@ void tx_thread(void * arg1, void * arg2, void * arg3)
             LOG_INF("Message id = [%d] successfully sended.\n", frame.id);
         }
 
-        k_sleep(SLEEP_TIME);
+        k_sleep(CAN_THREAD_SLEEP_MS);
     }
 }
 
