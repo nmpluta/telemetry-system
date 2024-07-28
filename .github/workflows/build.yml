@@ -8,6 +8,9 @@ jobs:
     container: zephyrprojectrtos/ci:latest
     env:
       CMAKE_PREFIX_PATH: /opt/toolchains
+    strategy:
+      matrix:
+        board: [mimxrt1060_evk, frdm_k64f]
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -25,12 +28,12 @@ jobs:
       - name: Build firmware
         working-directory: telemetry-system
         run: |
-          west build -b mimxrt1060_evk app
+          west build -b ${{ matrix.board }} app
 
       - name: Archive firmware
         uses: actions/upload-artifact@v2
         with:
-          name: firmware
+          name: firmware_${{ matrix.board }}
           path: telemetry-system/build/zephyr/zephyr.*
 
       - name: Format code
