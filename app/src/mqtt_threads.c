@@ -71,8 +71,8 @@ static MQTT_BMEM bool connected;
 #include "test_certs.h"
 
 #define TLS_SNI_HOSTNAME "localhost"
-#define MQTT_CA_CERT_TAG  1
-#define MQTT_PSK_TAG      2
+#define MQTT_CA_CERT_TAG 1
+#define MQTT_PSK_TAG     2
 
 static MQTT_DMEM sec_tag_t m_sec_tags[] = {
 #if defined(MBEDTLS_X509_CRT_PARSE_C) || defined(CONFIG_NET_SOCKETS_OFFLOAD)
@@ -541,8 +541,7 @@ void mqtt_thread(void *arg1, void *arg2, void *arg3)
 
     int r = 0, i = 0;
 
-    while (!CONFIG_MQTT_MAX_CONNECTIONS
-           || i++ < CONFIG_MQTT_MAX_CONNECTIONS)
+    while (!CONFIG_MQTT_MAX_CONNECTIONS || i++ < CONFIG_MQTT_MAX_CONNECTIONS)
     {
         r = publisher();
 

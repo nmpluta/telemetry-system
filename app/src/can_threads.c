@@ -58,7 +58,7 @@ k_tid_t rx_tid;
 k_tid_t tx_tid;
 k_tid_t can_state_tid;
 
-const struct device * const can_dev = DEVICE_DT_GET(DT_CHOSEN(zephyr_canbus));
+const struct device *const can_dev = DEVICE_DT_GET(DT_CHOSEN(zephyr_canbus));
 
 enum can_state         current_state;
 struct can_bus_err_cnt current_err_cnt;
@@ -74,18 +74,18 @@ extern struct k_msgq sd_msgq;
  *
  * @param frame The CAN frame to print
  */
-void can_frame_print(struct can_frame * frame)
+void can_frame_print(struct can_frame *frame)
 {
     LOG_INF("[CAN] [%03x] %02x %02x %02x %02x %02x %02x %02x %02x",
-           frame->id,
-           frame->data[0],
-           frame->data[1],
-           frame->data[2],
-           frame->data[3],
-           frame->data[4],
-           frame->data[5],
-           frame->data[6],
-           frame->data[7]);
+            frame->id,
+            frame->data[0],
+            frame->data[1],
+            frame->data[2],
+            frame->data[3],
+            frame->data[4],
+            frame->data[5],
+            frame->data[6],
+            frame->data[7]);
 }
 
 /**
@@ -96,9 +96,9 @@ void can_frame_print(struct can_frame * frame)
  * @param error The error code.
  * @param arg A pointer to the argument passed to the callback function.
  */
-void tx_irq_callback(const struct device * dev, int error, void * arg)
+void tx_irq_callback(const struct device *dev, int error, void *arg)
 {
-    char * sender = (char *)arg;
+    char *sender = (char *)arg;
 
     ARG_UNUSED(dev);
 
@@ -115,7 +115,7 @@ void tx_irq_callback(const struct device * dev, int error, void * arg)
  *
  * @return A string representation of the state.
  */
-char * state_to_str(enum can_state state)
+char *state_to_str(enum can_state state)
 {
     switch (state)
     {
@@ -135,14 +135,14 @@ char * state_to_str(enum can_state state)
 }
 
 /**
- * It waits for any meesage to be received, then it prints them and waits for the next CAN
- * frame
+ * It waits for any meesage to be received, then it prints them and waits for
+ * the next CAN frame
  *
  * @param arg1 CAN device
  * @param arg2 CAN device
  * @param arg3 The third argument to the thread.
  */
-void rx_thread(void * arg1, void * arg2, void * arg3)
+void rx_thread(void *arg1, void *arg2, void *arg3)
 {
     LOG_INF("Initialization of rx_thread.");
 
@@ -150,9 +150,8 @@ void rx_thread(void * arg1, void * arg2, void * arg3)
     ARG_UNUSED(arg2);
     ARG_UNUSED(arg3);
 
-    const struct can_filter filter = {.flags = 0U,
-                                      .id    = ALL_CAN_MSG_ID,
-                                      .mask  = ALL_CAN_MSG_MASK};
+    const struct can_filter filter
+        = { .flags = 0U, .id = ALL_CAN_MSG_ID, .mask = ALL_CAN_MSG_MASK };
 
     struct can_frame frame;
     int              filter_id;
@@ -179,14 +178,14 @@ void rx_thread(void * arg1, void * arg2, void * arg3)
 }
 
 /**
- * It sends requests for supported PIDs, waits for the responses, and then sends requests for the
- * supported PIDs
+ * It sends requests for supported PIDs, waits for the responses, and then sends
+ * requests for the supported PIDs
  *
  * @param arg1 Pointer to the first argument passed to the thread.
  * @param arg2 The CAN interface to use.
  * @param arg3 The third argument to the thread.
  */
-void tx_thread(void * arg1, void * arg2, void * arg3)
+void tx_thread(void *arg1, void *arg2, void *arg3)
 {
     LOG_INF("Initialization of tx_thread.");
 
@@ -200,7 +199,7 @@ void tx_thread(void * arg1, void * arg2, void * arg3)
     struct can_frame frame = {
         .id   = 0x123,
         .dlc  = 8,
-        .data = {1, 2, 3, 4, 5, 6, 7, 8},
+        .data = { 1, 2, 3, 4, 5, 6, 7, 8 },
     };
 
     while (1)
@@ -221,18 +220,19 @@ void tx_thread(void * arg1, void * arg2, void * arg3)
 }
 
 /**
- * It prints the CAN controller state, the number of received and transmitted errors
+ * It prints the CAN controller state, the number of received and transmitted
+ * errors
  *
  * @param unused1 The first parameter of the thread function.
  * @param unused2 The second parameter to the thread function.
  * @param unused3 This is the third parameter passed to the thread.
  */
-void can_state_thread(void * unused1, void * unused2, void * unused3)
+void can_state_thread(void *unused1, void *unused2, void *unused3)
 {
     LOG_INF("Initialization of can_state_thread.");
 
-    struct can_bus_err_cnt err_cnt      = {0, 0};
-    struct can_bus_err_cnt err_cnt_prev = {0, 0};
+    struct can_bus_err_cnt err_cnt      = { 0, 0 };
+    struct can_bus_err_cnt err_cnt_prev = { 0, 0 };
     enum can_state         state_prev   = CAN_STATE_ERROR_ACTIVE;
     enum can_state         state;
     int                    err;
@@ -247,19 +247,21 @@ void can_state_thread(void * unused1, void * unused2, void * unused3)
             continue;
         }
 
-        if (err_cnt.tx_err_cnt != err_cnt_prev.tx_err_cnt ||
-            err_cnt.rx_err_cnt != err_cnt_prev.rx_err_cnt || state_prev != state)
+        if (err_cnt.tx_err_cnt != err_cnt_prev.tx_err_cnt
+            || err_cnt.rx_err_cnt != err_cnt_prev.rx_err_cnt
+            || state_prev != state)
         {
 
             err_cnt_prev.tx_err_cnt = err_cnt.tx_err_cnt;
             err_cnt_prev.rx_err_cnt = err_cnt.rx_err_cnt;
             state_prev              = state;
-            LOG_INF("state: %s"
-                   "rx error count: %d"
-                   "tx error count: %d",
-                   state_to_str(state),
-                   err_cnt.rx_err_cnt,
-                   err_cnt.tx_err_cnt);
+            LOG_INF(
+                "state: %s"
+                "rx error count: %d"
+                "tx error count: %d",
+                state_to_str(state),
+                err_cnt.rx_err_cnt,
+                err_cnt.tx_err_cnt);
         }
         else
         {
@@ -270,19 +272,20 @@ void can_state_thread(void * unused1, void * unused2, void * unused3)
 
 /**
  * It prints the current state of the CAN controller.
- * If the controller is in the bus-off state and CONFIG_CAN_MANUAL_RECOVERY_MODE=y, it
- * attempts to recover from it.
+ * If the controller is in the bus-off state and
+ * CONFIG_CAN_MANUAL_RECOVERY_MODE=y, it attempts to recover from it.
  *
  * @param work The work item to be executed.
  */
-void state_change_work_handler(struct k_work * work)
+void state_change_work_handler(struct k_work *work)
 {
-    LOG_INF("State Change ISR\nstate: %s"
-           "rx error count: %d"
-           "tx error count: %d",
-           state_to_str(current_state),
-           current_err_cnt.rx_err_cnt,
-           current_err_cnt.tx_err_cnt);
+    LOG_INF(
+        "State Change ISR\nstate: %s"
+        "rx error count: %d"
+        "tx error count: %d",
+        state_to_str(current_state),
+        current_err_cnt.rx_err_cnt,
+        current_err_cnt.tx_err_cnt);
 
 #ifdef CONFIG_CAN_MANUAL_RECOVERY_MODE
     if (current_state == CAN_STATE_BUS_OFF)
@@ -302,15 +305,17 @@ void state_change_work_handler(struct k_work * work)
  *
  * @param dev The device that triggered the callback.
  * @param state The current state of the CAN controller.
- * @param err_cnt A struct containing the current error counters for the CAN bus.
- * @param user_data A pointer to the work object that will be submitted to the work queue.
+ * @param err_cnt A struct containing the current error counters for the CAN
+ * bus.
+ * @param user_data A pointer to the work object that will be submitted to the
+ * work queue.
  */
-void state_change_callback(const struct device *  dev,
+void state_change_callback(const struct device   *dev,
                            enum can_state         state,
                            struct can_bus_err_cnt err_cnt,
-                           void *                 user_data)
+                           void                  *user_data)
 {
-    struct k_work * work = (struct k_work *)user_data;
+    struct k_work *work = (struct k_work *)user_data;
 
     ARG_UNUSED(dev);
 
@@ -326,7 +331,7 @@ void state_change_callback(const struct device *  dev,
  *
  * @return The return value is the error code.
  */
-void can_init(const struct device * can_dev)
+void can_init(const struct device *can_dev)
 {
     int ret;
     (void)ret;
@@ -372,10 +377,11 @@ void can_init(const struct device * can_dev)
 }
 
 /**
- * It creates three threads, one for each of the three main tasks of the CAN driver:
+ * It creates three threads, one for each of the three main tasks of the CAN
+ * driver:
  *
- * * `can_state_thread`: This thread is responsible for monitoring the state of the CAN driver and
- * changing it as necessary.
+ * * `can_state_thread`: This thread is responsible for monitoring the state of
+ * the CAN driver and changing it as necessary.
  * * `rx_thread`: This thread is responsible for receiving CAN messages.
  * * `tx_thread`: This thread is responsible for transmitting CAN messages
  */
@@ -429,5 +435,6 @@ void can_threads_init(void)
         LOG_ERR("ERROR spawning tx thread.");
     }
 
-    can_set_state_change_callback(can_dev, state_change_callback, &state_change_work);
+    can_set_state_change_callback(
+        can_dev, state_change_callback, &state_change_work);
 }
