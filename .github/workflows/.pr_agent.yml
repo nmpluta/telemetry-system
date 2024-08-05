@@ -1,7 +1,14 @@
+# This workflow enables developers to call PR-Agents `/[actions]` in PR's comments and upon PR creation. 
+# Learn more at https://www.codium.ai/pr-agent/
+# This is v0.2 of this workflow file
+
+name: PR-Agent
+
 on:
   pull_request:
     types: [opened, reopened, ready_for_review]
   issue_comment:
+
 jobs:
   pr_agent_job:
     if: ${{ github.event.sender.type != 'Bot' }}
@@ -18,6 +25,6 @@ jobs:
         env:
           OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          github_action_config.auto_review: "true" # enable auto review
-          github_action_config.auto_describe: "true" # enable auto describe
-          github_action_config.auto_improve: "true" # enable auto improve
+          GITHUB_ACTION_CONFIG.AUTO_DESCRIBE: true
+          GITHUB_ACTION_CONFIG.AUTO_REVIEW: true
+          GITHUB_ACTION_CONFIG.AUTO_IMPROVE: true
